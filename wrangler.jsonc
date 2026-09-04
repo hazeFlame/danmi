@@ -29,7 +29,7 @@
 			"database_id": "564292ea-3114-4df3-beb0-472f29db4c94",
 			"migrations_dir": "drizzle"
 		}
-	]
+	],
 	/**
 	 * Smart Placement
 	 * https://developers.cloudflare.com/workers/configuration/smart-placement/#smart-placement
@@ -47,7 +47,10 @@
 	 * Note: Use secrets to store sensitive data.
 	 * https://developers.cloudflare.com/workers/configuration/secrets/
 	 */
-	// "vars": {  "MY_VARIABLE": "production_value" }
+	"vars": {
+		"BETTER_AUTH_SECRET": "f65187b06e941baff7a6f15b190c5677f5dcb6bbc59b5bc1a1a9538a16c8000e76efdde2535d7e9418217fbe3acf5d2c77e7bf958cf48eaa6411a54bccab76f8",
+		"BETTER_AUTH_URL": "https://danmi.girlove.live"
+	}
 	/**
 	 * Service Bindings (communicate between multiple Workers)
 	 * https://developers.cloudflare.com/workers/wrangler/configuration/#service-bindings
