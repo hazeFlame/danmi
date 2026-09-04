@@ -112,7 +112,7 @@ pnpm run db:generate
 # 本地执行迁移
 pnpm run db:migrate:local
 
-# 生产远程执行迁移 (需先执行 npx wrangler d1 create lark-auth-db 并在 wrangler.jsonc 填入 database_id)
+# 生产远程执行迁移 (需先执行 npx wrangler d1 create danmi 并在 wrangler.jsonc 填入 database_id)
 pnpm run db:migrate:remote
 ```
 

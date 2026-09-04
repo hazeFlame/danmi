@@ -40,7 +40,7 @@
 	},
 	"type": "module",
 	"scripts": {
-		"dev": "wrangler d1 migrations apply lark-auth-db --local && vinext dev",
+		"dev": "wrangler d1 migrations apply danmi --local && vinext dev",
 		"build": "vinext build",
 		"start": "wrangler dev --config dist/server/wrangler.json",
 		"deploy": "pnpm run check && pnpm run db:migrate:remote && pnpm run build && vinext-cloudflare deploy --config dist/server/wrangler.json",
@@ -50,8 +50,8 @@
 		"typecheck": "tsc --noEmit",
 		"cf-typegen": "wrangler types --env-interface CloudflareEnv ./worker-configuration.d.ts",
 		"db:generate": "drizzle-kit generate",
-		"db:migrate:local": "wrangler d1 migrations apply lark-auth-db --local",
-		"db:migrate:remote": "wrangler d1 migrations apply lark-auth-db --remote",
+		"db:migrate:local": "wrangler d1 migrations apply danmi --local",
+		"db:migrate:remote": "wrangler d1 migrations apply danmi --remote",
 		"db:check": "drizzle-kit check",
 		"db:studio": "drizzle-kit studio",
 		"mcp": "tsx src/mcp/stdio.ts"
