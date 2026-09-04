@@ -350,4 +350,369 @@ export class FeishuClient {
       has_more: data.has_more,
     };
   }
+
+  /**
+   * Update task fields (PATCH /open-apis/task/v2/tasks/:task_guid)
+   */
+  public async patchTask(
+    taskGuid: string,
+    payload: {
+      task: Record<string, any>;
+      update_fields: string[];
+    },
+    options: { userIdType?: string; token?: string } = {}
+  ): Promise<FeishuTask> {
+    const userIdType = options.userIdType || "open_id";
+    const endpoint = `/open-apis/task/v2/tasks/${encodeURIComponent(
+      taskGuid
+    )}?user_id_type=${userIdType}`;
+
+    const data = await this.request<{ task: FeishuTask }>(endpoint, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json; charset=utf-8" },
+      body: JSON.stringify(payload),
+      token: options.token,
+    });
+
+    return data.task;
+  }
+
+  /**
+   * Complete a task by setting completed_at to current timestamp (打勾完成任务)
+   */
+  public async completeTask(
+    taskGuid: string,
+    options: { userIdType?: string; token?: string } = {}
+  ): Promise<FeishuTask> {
+    return this.patchTask(
+      taskGuid,
+      {
+        task: { completed_at: Date.now().toString() },
+        update_fields: ["completed_at"],
+      },
+      options
+    );
+  }
+
+  /**
+   * Uncomplete/restore a task by setting completed_at to "0" (恢复任务至未完成)
+   */
+  public async uncompleteTask(
+    taskGuid: string,
+    options: { userIdType?: string; token?: string } = {}
+  ): Promise<FeishuTask> {
+    return this.patchTask(
+      taskGuid,
+      {
+        task: { completed_at: "0" },
+        update_fields: ["completed_at"],
+      },
+      options
+    );
+  }
+
+  /**
+   * Create a new task
+   */
+  public async createTask(
+    task: {
+      summary: string;
+      description?: string;
+      due?: { timestamp?: string; is_all_day?: boolean };
+      members?: Array<{ id: string; type?: string; role?: string }>;
+    },
+    options: { userIdType?: string; token?: string } = {}
+  ): Promise<FeishuTask> {
+    const userIdType = options.userIdType || "open_id";
+    const endpoint = `/open-apis/task/v2/tasks?user_id_type=${userIdType}`;
+
+    const data = await this.request<{ task: FeishuTask }>(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json; charset=utf-8" },
+      body: JSON.stringify({ task }),
+      token: options.token,
+    });
+
+    return data.task;
+  }
+
+  // =========================================================================
+  // 多维表格 (Bitable) API
+  // =========================================================================
+
+  /**
+   * 列出多维表格中的所有数据表
+   */
+  public async listBitableTables(
+    appToken: string,
+    options: { pageSize?: number; pageToken?: string; token?: string } = {}
+  ): Promise<{ items: Array<{ table_id: string; revision: number; name: string }>; has_more?: boolean; page_token?: string; total?: number }> {
+    const params = new URLSearchParams();
+    if (options.pageSize) params.set("page_size", String(options.pageSize));
+    if (options.pageToken) params.set("page_token", options.pageToken);
+
+    const endpoint = `/open-apis/bitable/v1/apps/${encodeURIComponent(appToken)}/tables?${params.toString()}`;
+    return this.request(endpoint, { method: "GET", token: options.token });
+  }
+
+  /**
+   * 列出多维表格数据表的字段列表
+   */
+  public async listBitableFields(
+    appToken: string,
+    tableId: string,
+    options: { pageSize?: number; pageToken?: string; token?: string } = {}
+  ): Promise<{ items: Array<{ field_id: string; field_name: string; type: number; ui_type?: string }>; has_more?: boolean; page_token?: string }> {
+    const params = new URLSearchParams();
+    if (options.pageSize) params.set("page_size", String(options.pageSize));
+    if (options.pageToken) params.set("page_token", options.pageToken);
+
+    const endpoint = `/open-apis/bitable/v1/apps/${encodeURIComponent(appToken)}/tables/${encodeURIComponent(tableId)}/fields?${params.toString()}`;
+    return this.request(endpoint, { method: "GET", token: options.token });
+  }
+
+  /**
+   * 查询与搜索多维表格记录
+   */
+  public async searchBitableRecords(
+    appToken: string,
+    tableId: string,
+    options: { pageSize?: number; pageToken?: string; filter?: string; sort?: string; token?: string } = {}
+  ): Promise<{ items: Array<{ record_id: string; fields: Record<string, any> }>; has_more?: boolean; page_token?: string; total?: number }> {
+    const params = new URLSearchParams();
+    if (options.pageSize) params.set("page_size", String(options.pageSize));
+    if (options.pageToken) params.set("page_token", options.pageToken);
+    if (options.filter) params.set("filter", options.filter);
+    if (options.sort) params.set("sort", options.sort);
+
+    const endpoint = `/open-apis/bitable/v1/apps/${encodeURIComponent(appToken)}/tables/${encodeURIComponent(tableId)}/records?${params.toString()}`;
+    return this.request(endpoint, { method: "GET", token: options.token });
+  }
+
+  /**
+   * 获取多维表格单条记录详情
+   */
+  public async getBitableRecord(
+    appToken: string,
+    tableId: string,
+    recordId: string,
+    options: { token?: string } = {}
+  ): Promise<{ record: { record_id: string; fields: Record<string, any>; record_url?: string } }> {
+    const endpoint = `/open-apis/bitable/v1/apps/${encodeURIComponent(appToken)}/tables/${encodeURIComponent(tableId)}/records/${encodeURIComponent(recordId)}`;
+    return this.request(endpoint, { method: "GET", token: options.token });
+  }
+
+  /**
+   * 新增多维表格记录行
+   */
+  public async createBitableRecord(
+    appToken: string,
+    tableId: string,
+    fields: Record<string, any>,
+    options: { token?: string } = {}
+  ): Promise<{ record: { record_id: string; fields: Record<string, any> } }> {
+    const endpoint = `/open-apis/bitable/v1/apps/${encodeURIComponent(appToken)}/tables/${encodeURIComponent(tableId)}/records`;
+    return this.request(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json; charset=utf-8" },
+      body: JSON.stringify({ fields }),
+      token: options.token,
+    });
+  }
+
+  /**
+   * 更新多维表格记录行
+   */
+  public async updateBitableRecord(
+    appToken: string,
+    tableId: string,
+    recordId: string,
+    fields: Record<string, any>,
+    options: { token?: string } = {}
+  ): Promise<{ record: { record_id: string; fields: Record<string, any> } }> {
+    const endpoint = `/open-apis/bitable/v1/apps/${encodeURIComponent(appToken)}/tables/${encodeURIComponent(tableId)}/records/${encodeURIComponent(recordId)}`;
+    return this.request(endpoint, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json; charset=utf-8" },
+      body: JSON.stringify({ fields }),
+      token: options.token,
+    });
+  }
+
+  // =========================================================================
+  // 新版云文档 (Docx) API
+  // =========================================================================
+
+  /**
+   * 获取新版云文档纯文本/Markdown内容
+   */
+  public async getDocumentRawContent(
+    documentId: string,
+    options: { token?: string } = {}
+  ): Promise<{ content: string }> {
+    const endpoint = `/open-apis/docx/v1/documents/${encodeURIComponent(documentId)}/raw_content`;
+    return this.request(endpoint, { method: "GET", token: options.token });
+  }
+
+  /**
+   * 创建新的云文档
+   */
+  public async createDocument(
+    title: string,
+    folderToken?: string,
+    options: { token?: string } = {}
+  ): Promise<{ document: { document_id: string; title: string; revision_id?: number } }> {
+    const endpoint = `/open-apis/docx/v1/documents`;
+    return this.request(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json; charset=utf-8" },
+      body: JSON.stringify({ title, folder_token: folderToken }),
+      token: options.token,
+    });
+  }
+
+  // =========================================================================
+  // 日程与日历 (Calendar) API
+  // =========================================================================
+
+  /**
+   * 获取用户的日历列表
+   */
+  public async listCalendars(
+    options: { pageSize?: number; pageToken?: string; token?: string } = {}
+  ): Promise<{ calendar_list: Array<{ id: string; summary: string; description?: string; permissions?: string }> }> {
+    const params = new URLSearchParams();
+    if (options.pageSize) params.set("page_size", String(options.pageSize));
+    if (options.pageToken) params.set("page_token", options.pageToken);
+
+    const endpoint = `/open-apis/calendar/v4/calendars?${params.toString()}`;
+    return this.request(endpoint, { method: "GET", token: options.token });
+  }
+
+  /**
+   * 查询指定日历的日程事件
+   */
+  public async listCalendarEvents(
+    calendarId: string,
+    options: { startTime?: string; endTime?: string; pageSize?: number; pageToken?: string; token?: string } = {}
+  ): Promise<{ items: Array<{ event_id: string; summary: string; description?: string; start_time?: { timestamp?: string }; end_time?: { timestamp?: string }; app_link?: string }> }> {
+    const params = new URLSearchParams();
+    if (options.startTime) params.set("start_time", options.startTime);
+    if (options.endTime) params.set("end_time", options.endTime);
+    if (options.pageSize) params.set("page_size", String(options.pageSize));
+    if (options.pageToken) params.set("page_token", options.pageToken);
+
+    const endpoint = `/open-apis/calendar/v4/calendars/${encodeURIComponent(calendarId)}/events?${params.toString()}`;
+    return this.request(endpoint, { method: "GET", token: options.token });
+  }
+
+  /**
+   * 创建日程事件
+   */
+  public async createCalendarEvent(
+    calendarId: string,
+    event: {
+      summary: string;
+      description?: string;
+      startTime: { timestamp: string };
+      endTime: { timestamp: string };
+    },
+    options: { token?: string } = {}
+  ): Promise<{ event: any }> {
+    const endpoint = `/open-apis/calendar/v4/calendars/${encodeURIComponent(calendarId)}/events`;
+    return this.request(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json; charset=utf-8" },
+      body: JSON.stringify({
+        summary: event.summary,
+        description: event.description,
+        start_time: event.startTime,
+        end_time: event.endTime,
+      }),
+      token: options.token,
+    });
+  }
+
+  // =========================================================================
+  // 即时通讯与消息 (IM) API
+  // =========================================================================
+
+  /**
+   * 发送即时消息（支持文本、卡片等）
+   */
+  public async sendMessage(
+    receiveIdType: "open_id" | "chat_id" | "user_id" | "email",
+    receiveId: string,
+    msgType: "text" | "post" | "interactive",
+    content: string,
+    options: { token?: string } = {}
+  ): Promise<any> {
+    const endpoint = `/open-apis/im/v1/messages?receive_id_type=${receiveIdType}`;
+    return this.request(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json; charset=utf-8" },
+      body: JSON.stringify({
+        receive_id: receiveId,
+        msg_type: msgType,
+        content,
+      }),
+      token: options.token,
+    });
+  }
+
+  // =========================================================================
+  // 用户基础信息 (Contact/User) API
+  // =========================================================================
+
+  /**
+   * 获取当前授权用户的基本信息（姓名、open_id、头像等）
+   */
+  public async getUserInfo(options: { token?: string } = {}): Promise<{
+    name: string;
+    en_name?: string;
+    avatar_url?: string;
+    open_id?: string;
+    union_id?: string;
+    user_id?: string;
+    tenant_key?: string;
+  }> {
+    const endpoint = `/open-apis/authen/v1/user_info`;
+    return this.request<any>(endpoint, {
+      method: "GET",
+      token: options.token,
+    });
+  }
+
+  // =========================================================================
+  // 知识库 (Wiki) API
+  // =========================================================================
+
+  /**
+   * 获取知识库空间列表
+   */
+  public async listWikiSpaces(
+    options: { pageSize?: number; pageToken?: string; token?: string } = {}
+  ): Promise<{ items: Array<{ space_id: string; name: string; description?: string; space_type?: string }>; page_token?: string; has_more?: boolean }> {
+    const params = new URLSearchParams();
+    if (options.pageSize) params.set("page_size", String(options.pageSize));
+    if (options.pageToken) params.set("page_token", options.pageToken);
+
+    const endpoint = `/open-apis/wiki/v2/spaces?${params.toString()}`;
+    return this.request(endpoint, { method: "GET", token: options.token });
+  }
+
+  /**
+   * 获取知识库节点信息（包含对应文档 obj_token 与 obj_type）
+   */
+  public async getWikiNode(
+    token: string,
+    options: { token?: string } = {}
+  ): Promise<{ node: { space_id: string; node_token: string; obj_token: string; obj_type: string; title: string; has_child?: boolean } }> {
+    const params = new URLSearchParams({ token });
+    const endpoint = `/open-apis/wiki/v2/spaces/get_node?${params.toString()}`;
+    return this.request(endpoint, { method: "GET", token: options.token });
+  }
 }
+
+
+

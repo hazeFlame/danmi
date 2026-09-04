@@ -42,7 +42,7 @@ export default function McpPortalPage() {
   const [feishuError, setFeishuError] = useState<string | null>(null);
   const [feishuSuccess, setFeishuSuccess] = useState<string | null>(null);
 
-  // Device Flow states (One-click popup authorization)
+  // 设备流状态
   const [deviceFlowActive, setDeviceFlowActive] = useState(false);
   const [deviceStep, setDeviceStep] = useState<1 | 2>(1);
   const [deviceStatusText, setDeviceStatusText] = useState("");
@@ -82,7 +82,7 @@ export default function McpPortalPage() {
   }
 
   // =========================================================================
-  // 核心：一键设备授权流程 (App Registration + Device Authorization)
+  // 一键免密设备流授权流程
   // =========================================================================
   async function handleStartOneClickAuth() {
     setFeishuError(null);
@@ -116,9 +116,7 @@ export default function McpPortalPage() {
 
       const { verificationUrl, deviceCode } = startData;
       setActiveVerificationUrl(verificationUrl);
-      setDeviceStatusText(
-        "已打开飞书授权窗口，请在弹窗中选择或创建应用..."
-      );
+      setDeviceStatusText("已打开飞书授权窗口，请在弹窗中选择或创建应用...");
 
       if (popup && !popup.closed) {
         popup.location.href = verificationUrl;
@@ -191,8 +189,8 @@ export default function McpPortalPage() {
             }
 
             scheduleNextStep1Poll();
-          } catch (err) {
-            console.warn("轮询状态中...", err);
+          } catch (pollErr: any) {
+            console.warn("轮询状态中...", pollErr);
             scheduleNextStep1Poll();
           }
         }, currentInterval);
@@ -213,9 +211,9 @@ export default function McpPortalPage() {
     step2DeviceCode: string
   ) {
     let step2PollCount = 0;
-    let step2Interval = 5000;
+    let currentInterval = 5000;
 
-    const scheduleNextStep2Poll = () => {
+    const scheduleNextTokenPoll = () => {
       pollTimerRef.current = setTimeout(async () => {
         step2PollCount++;
         if (step2PollCount > 80) {
@@ -224,7 +222,7 @@ export default function McpPortalPage() {
         }
 
         try {
-          const tokenRes = await fetch("/api/feishu/device", {
+          const pollRes = await fetch("/api/feishu/device", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -235,43 +233,39 @@ export default function McpPortalPage() {
               step2DeviceCode,
             }),
           });
-          const tokenData = (await tokenRes.json()) as any;
+          const pollData = (await pollRes.json()) as any;
 
-          if (tokenData.slowDown) {
-            step2Interval = Math.min(step2Interval + 2000, 12000);
+          if (pollData.slowDown) {
+            currentInterval = Math.min(currentInterval + 2000, 12000);
           }
 
-          if (tokenData.status === "completed") {
+          if (pollData.status === "completed") {
             finishAuthSuccess(appName, appId);
             return;
           }
 
-          scheduleNextStep2Poll();
+          scheduleNextTokenPoll();
         } catch (err) {
           console.warn("阶段二轮询中...", err);
-          scheduleNextStep2Poll();
+          scheduleNextTokenPoll();
         }
-      }, step2Interval);
+      }, currentInterval);
     };
 
-    scheduleNextStep2Poll();
+    scheduleNextTokenPoll();
   }
 
   function finishAuthSuccess(appName?: string, appId?: string) {
     if (pollTimerRef.current) clearInterval(pollTimerRef.current);
-    if (popupRef.current && !popupRef.current.closed) {
-      popupRef.current.close();
-    }
+    if (popupRef.current && !popupRef.current.closed) popupRef.current.close();
     setDeviceFlowActive(false);
-    setFeishuSuccess(`已连接飞书应用「${appName || appId || "自建应用"}」`);
+    setFeishuSuccess(`已成功连接飞书应用「${appName || appId || "自建应用"}」`);
     loadFeishuConfig();
   }
 
   function handleCancelAuth() {
     if (pollTimerRef.current) clearInterval(pollTimerRef.current);
-    if (popupRef.current && !popupRef.current.closed) {
-      popupRef.current.close();
-    }
+    if (popupRef.current && !popupRef.current.closed) popupRef.current.close();
     setDeviceFlowActive(false);
     setDeviceStatusText("");
   }
@@ -279,11 +273,12 @@ export default function McpPortalPage() {
   async function handleDeleteFeishu() {
     if (
       !confirm(
-        "确定要解除此飞书应用的绑定吗？解除后使用该账号的 MCP Token 将无法再读取飞书任务。"
+        "确定要解除此飞书应用的绑定吗？解除后 MCP 端点将无法再访问飞书服务。"
       )
     ) {
       return;
     }
+
     try {
       const res = await fetch("/api/feishu/config", { method: "DELETE" });
       if (res.ok) {
@@ -305,13 +300,14 @@ export default function McpPortalPage() {
 
   return (
     <div className="space-y-6">
-      {/* Feedback Alerts */}
+      {/* 提示消息 */}
       {feishuError && (
         <Alert variant="destructive" className="py-2.5">
           <AlertCircle className="size-4" />
           <AlertDescription className="text-xs">{feishuError}</AlertDescription>
         </Alert>
       )}
+
       {feishuSuccess && (
         <Alert className="py-2.5 border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300">
           <CheckCircle2 className="size-4" />
@@ -319,7 +315,7 @@ export default function McpPortalPage() {
         </Alert>
       )}
 
-      {/* 核心卡片：连接飞书自建应用 */}
+      {/* 飞书连接卡片 */}
       <Card className="border-primary/20 shadow-xs">
         <CardHeader className="flex flex-row items-center justify-between pb-3">
           <div className="space-y-1">
@@ -328,7 +324,7 @@ export default function McpPortalPage() {
               飞书应用
             </CardTitle>
             <CardDescription className="text-xs">
-              授权飞书自建应用，为 MCP 提供任务数据访问能力。
+              连接飞书自建应用，为 MCP 提供办公协同与数据访问能力。
             </CardDescription>
           </div>
           {feishuConfig?.configured ? (
@@ -345,8 +341,8 @@ export default function McpPortalPage() {
         </CardHeader>
 
         <CardContent className="space-y-4 pt-1">
-          {/* 状态 1: 已配置 */}
           {feishuConfig?.configured && !deviceFlowActive ? (
+            /* 状态 1: 已绑定 */
             <div className="flex flex-wrap items-center justify-between gap-4 p-4 rounded-lg border bg-muted/30">
               <div className="space-y-1.5">
                 <div className="flex items-center gap-2">
@@ -403,7 +399,7 @@ export default function McpPortalPage() {
                 </Badge>
               </div>
 
-              {/* 进度步进条 */}
+              {/* 进度指示 */}
               <div className="grid grid-cols-2 gap-3 text-xs">
                 <div
                   className={cn(
@@ -457,7 +453,7 @@ export default function McpPortalPage() {
               </div>
             </div>
           ) : (
-            /* 状态 3: 未配置 - 授权连接按钮 */
+            /* 状态 3: 未配置 */
             <div className="p-6 rounded-lg border border-dashed border-primary/40 bg-gradient-to-b from-primary/5 to-transparent text-center space-y-3">
               <div className="mx-auto size-11 rounded-full bg-primary/10 flex items-center justify-center text-primary">
                 <Rocket className="size-5" />

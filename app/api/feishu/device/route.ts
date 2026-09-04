@@ -75,7 +75,7 @@ export async function POST(req: Request) {
     // 阶段一轮询：检查用户是否在弹窗中选择已有应用或创建了新应用
     // =========================================================================
     if (action === "poll_app") {
-      const { deviceCode } = body;
+      const { deviceCode, customScope } = body;
       if (!deviceCode) {
         return Response.json({ error: "缺少 deviceCode 参数" }, { status: 400 });
       }
@@ -158,13 +158,41 @@ export async function POST(req: Request) {
       try {
         const basicAuth = btoa(`${clientId}:${clientSecret}`);
 
-        // 依次尝试候选 scope（使用飞书官方标准的 task:task:read 与 task:tasklist:read，支持开通并授权）
-        const scopeCandidates = [
+        // 梯队化候选 scope：纯免审只读权限优先（无需管理员审核）
+        const baseCandidates = [
+          // 1. 办公全生态免审只读全家桶（多维表格 + 云文档 + 知识库 + 日历 + 任务 + 通讯录）
+          "bitable:app:readonly docx:document:readonly wiki:wiki:readonly calendar:calendar:readonly task:task:read task:tasklist:read task:comment:read contact:user.base:readonly offline_access",
+          // 2. 多维表格 + 任务系统全套免审（多维表格 + 任务全套只读）
+          "bitable:app:readonly task:task:read task:tasklist:read task:comment:read offline_access",
+          "bitable:app:readonly task:task:read task:tasklist:read offline_access",
+          // 3. 多维表格 + 云文档 + 任务协同组合
+          "bitable:app:readonly docx:document:readonly task:task:read task:tasklist:read task:comment:read offline_access",
+          "bitable:app:readonly docx:document:readonly calendar:calendar:readonly task:task:read task:tasklist:read task:comment:read offline_access",
+          // 4. 单多维表格免审只读
+          "bitable:app:readonly offline_access",
+          // 5. 任务核心免审只读（无需管理员审批，勾选即用）
           "task:task:read task:tasklist:read task:comment:read offline_access",
           "task:task:read task:tasklist:read offline_access",
-          "task:task offline_access",
+          "task:task:read offline_access",
+          // 6. 其他生态模块免审兜底
+          "docx:document:readonly offline_access",
+          "calendar:calendar:readonly offline_access",
+          "contact:user.base:readonly offline_access",
+          // 7. 基础离线访问兜底
           "offline_access",
         ];
+
+        let customCandidate: string | null = null;
+        if (typeof customScope === "string" && customScope.trim()) {
+          const trimmed = customScope.trim();
+          customCandidate = trimmed.includes("offline_access")
+            ? trimmed
+            : `${trimmed} offline_access`;
+        }
+
+        const scopeCandidates = Array.from(
+          new Set(customCandidate ? [customCandidate, ...baseCandidates] : baseCandidates)
+        );
 
         let devAuthData: any = null;
 
