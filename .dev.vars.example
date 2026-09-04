@@ -1,0 +1,4 @@
+# Cloudflare Wrangler local environment variables (.dev.vars)
+# Better Auth 服务端密钥与服务 URL (多租户架构下服务端仅需此项配置)
+BETTER_AUTH_SECRET=feishu_mcp_better_auth_default_secret_key_32_chars
+BETTER_AUTH_URL=http://localhost:3000
